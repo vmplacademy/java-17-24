@@ -44,8 +44,9 @@ public sealed abstract class LLMModel permits ChatGPTModel, GeminiModel, ClaudeM
 
     /**
      * Process input data and return a response.
+     * Uses Java's String.formatted() method to create a formatted string with model details.
      */
     public String process(String input) {
-        return String.format("%s maxTokens=%d, temperature=%s", getModelName(), maxTokens, DECIMAL_FORMAT.format(temperature));
+        return "%s maxTokens=%d, temperature=%s".formatted(getModelName(), maxTokens, DECIMAL_FORMAT.format(temperature));
     }
 } 
