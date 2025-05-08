@@ -55,6 +55,8 @@
                         <arg>java.base/java.util=ALL-UNNAMED</arg>
                         <arg>--add-opens</arg>
                         <arg>java.base/java.util.concurrent=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg>
+                        <arg>java.base/java.lang.reflect=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
