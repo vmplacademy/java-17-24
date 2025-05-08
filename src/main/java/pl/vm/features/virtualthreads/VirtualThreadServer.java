@@ -1,142 +1,81 @@
 package pl.vm.features.virtualthreads;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.lang.ScopedValue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A simple web server that demonstrates the use of virtual threads in Java 24.
- * This server uses modern Java features like ScopedValue and StructuredTaskScope.
+ * This server uses Java's built-in Simple Web Server with virtual threads.
  */
 public class VirtualThreadServer {
-    private final int requestedPort;
-    private final ExecutorService executor;
+    private final int port;
+    private HttpServer server;
     private volatile boolean running;
-    private ServerSocketChannel serverSocket;
-    private volatile int actualPort;
-    private final AtomicInteger threadCounter = new AtomicInteger();
-    
-    // ScopedValue for request context
-    private static final ScopedValue<RequestContext> REQUEST_CONTEXT = ScopedValue.newInstance();
 
     public VirtualThreadServer(int port) {
-        this.requestedPort = port;
-        // Create a virtual thread executor with custom thread factory
-        ThreadFactory factory = r -> {
-            Thread thread = Thread.ofVirtual().unstarted(r);
-            thread.setName("virtual-thread-" + threadCounter.getAndIncrement());
-            return thread;
-        };
-        this.executor = Executors.newThreadPerTaskExecutor(factory);
+        this.port = port;
     }
 
     public void start() {
-        running = true;
         try {
-            serverSocket = ServerSocketChannel.open();
-            serverSocket.bind(new InetSocketAddress(requestedPort));
-            actualPort = ((InetSocketAddress) serverSocket.getLocalAddress()).getPort();
-            System.out.println("Server started on port " + actualPort);
-
-            while (running) {
-                SocketChannel clientSocket = serverSocket.accept();
-                // Handle each client connection in a new virtual thread
-                executor.submit(() -> handleClient(clientSocket));
-            }
-        } catch (IOException e) {
-            System.err.println("Server error: " + e.getMessage());
-        } finally {
-            executor.close();
-        }
-    }
-
-    private void handleClient(SocketChannel clientSocket) {
-        try (clientSocket) {
-            // Create request context with timestamp
-            var context = new RequestContext(System.currentTimeMillis());
+            // Create server with virtual thread executor
+            server = HttpServer.create(new InetSocketAddress(port), 0);
+            server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
             
-            // Use ScopedValue to bind context to the current virtual thread
-            ScopedValue.where(REQUEST_CONTEXT, context).run(() -> {
+            // Add handler for root path
+            server.createContext("/", exchange -> {
                 try {
                     // Simulate some I/O-bound work
                     Thread.sleep(Duration.ofMillis(100));
                     
-                    // Read the request
-                    ByteBuffer buffer = ByteBuffer.allocate(1024);
-                    clientSocket.read(buffer);
-                    buffer.flip();
-                    String request = StandardCharsets.UTF_8.decode(buffer).toString();
+                    Thread currentThread = Thread.currentThread();
+                    String threadName = currentThread.getName();
+                    boolean isVirtual = currentThread.isVirtual();
                     
-                    // Process the request and generate a response
-                    String response = processRequest(request);
+                    System.out.println("Handling request in thread: " + threadName + " (isVirtual: " + isVirtual + ")");
                     
-                    // Send the response
-                    buffer.clear();
-                    buffer.put(StandardCharsets.UTF_8.encode(response));
-                    buffer.flip();
-                    clientSocket.write(buffer);
-                } catch (IOException | InterruptedException e) {
-                    System.err.println("Error handling client: " + e.getMessage());
+                    String content = String.format("Hello from %s thread: %s%nRequest started at: %d",
+                            isVirtual ? "virtual" : "platform",
+                            threadName,
+                            System.currentTimeMillis());
+                    
+                    // Send response
+                    exchange.sendResponseHeaders(200, content.length());
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(content.getBytes());
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    exchange.sendResponseHeaders(500, 0);
+                    exchange.close();
                 }
             });
-        } catch (IOException e) {
-            System.err.println("Error handling client: " + e.getMessage());
-        }
-    }
-
-    private String processRequest(String request) {
-        // Get the request context from ScopedValue
-        var context = REQUEST_CONTEXT.get();
-        
-        // Simulate some processing time
-        try {
-            Thread.sleep(Duration.ofMillis(50));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        
-        // Print current thread name for debugging
-        String threadName = Thread.currentThread().getName();
-        System.out.println("Processing request in thread: " + threadName);
-        
-        String content = "Hello from virtual thread: " + threadName + "\nRequest started at: " + context.timestamp();
-        return """
-            HTTP/1.1 200 OK
-            Content-Type: text/plain
-            Content-Length: %d
             
-            %s""".formatted(content.length(), content);
+            server.start();
+            running = true;
+            System.out.println("Server started on port " + port);
+        } catch (IOException e) {
+            System.err.println("Server error: " + e.getMessage());
+        }
     }
 
     public void stop() {
-        running = false;
-        try {
-            if (serverSocket != null) {
-                serverSocket.close();
-            }
-        } catch (IOException e) {
-            System.err.println("Error stopping server: " + e.getMessage());
+        if (server != null) {
+            server.stop(0);
+            running = false;
         }
     }
 
     public int getPort() {
-        return actualPort;
+        return port;
     }
 
     public static void main(String[] args) {
         VirtualThreadServer server = new VirtualThreadServer(8080);
         server.start();
     }
-    
-    // Record for request context
-    private record RequestContext(long timestamp) {}
 } 
