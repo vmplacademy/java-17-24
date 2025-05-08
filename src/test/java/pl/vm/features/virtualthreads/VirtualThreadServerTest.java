@@ -9,22 +9,24 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.regex.Pattern;
+import java.io.IOException;
 
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class VirtualThreadServerTest {
+    private static final Logger logger = LoggerFactory.getLogger(VirtualThreadServerTest.class);
     private VirtualThreadServer server;
     private HttpClient httpClient;
-    private ExecutorService executor;
-    private static final Pattern VIRTUAL_THREAD_PATTERN = Pattern.compile(".*");  // Accept any thread name for now
+    private ExecutorService executor;  // Accept any thread name for now
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         // Start server on port 8080
         server = new VirtualThreadServer(8080);
         Thread serverThread = new Thread(() -> server.start());
@@ -108,7 +110,7 @@ class VirtualThreadServerTest {
 
         // Print response body for debugging
         String responseBody = response.body();
-        System.out.println("Response body: " + responseBody);
+        logger.info("Response body: {}", responseBody);
 
         // Verify that the thread is virtual
         assertTrue(responseBody.contains("Hello from virtual thread"),

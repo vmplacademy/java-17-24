@@ -5,6 +5,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test class demonstrating the usage of sealed classes in Java.
@@ -34,6 +36,7 @@ import org.junit.jupiter.api.Test;
  * @see <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a>
  */
 class LLMModelTest {
+    private static final Logger logger = LoggerFactory.getLogger(LLMModelTest.class);
 
     @Test
     void test_chat_gpt_model_processing() {
@@ -42,7 +45,7 @@ class LLMModelTest {
         
         // when
         String result = model.process("Hello, world!");
-        System.out.println("ChatGPT result: " + result);
+        logger.info("ChatGPT result: {}", result);
         
         // then
         assertEquals("1.0", model.getVersion());
@@ -62,7 +65,7 @@ class LLMModelTest {
         
         // when
         String result = model.process("Hello, world!");
-        System.out.println("Gemini result: " + result);
+        logger.info("Gemini result: {}", result);
         
         // then
         assertEquals("1.0", model.getVersion());
@@ -82,7 +85,7 @@ class LLMModelTest {
         
         // when
         String result = model.process("Hello, world!");
-        System.out.println("Claude result: " + result);
+        logger.info("Claude result: {}", result);
         
         // then
         assertEquals("1.0", model.getVersion());
@@ -102,7 +105,7 @@ class LLMModelTest {
         
         // when
         String result = model.process("Hello, world!");
-        System.out.println("DeepSeek result: " + result);
+        logger.info("DeepSeek result: {}", result);
         
         // then
         assertEquals("1.0", model.getVersion());
