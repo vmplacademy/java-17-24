@@ -6,6 +6,7 @@ import java.util.stream.Gatherer;
 import java.util.stream.Gatherers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,9 +64,56 @@ class GatherersDemoTest {
         assertEquals(4.0, averages.get(2));
     }
 
+    @Test
+    void should_batch_elements_in_groups_of_three() {
+        // given
+        List<String> items = List.of("A", "B", "C", "D", "E", "F", "G");
+        
+        // when
+        List<List<String>> batches = items.stream()
+            .gather(createBatchGatherer(3))
+            .toList();
+        
+        // then
+        assertEquals(3, batches.size());
+        assertEquals(List.of("A", "B", "C"), batches.get(0));
+        assertEquals(List.of("D", "E", "F"), batches.get(1));
+        assertEquals(List.of("G"), batches.get(2));
+    }
+
+    @Test
+    void should_handle_empty_list_when_batching() {
+        // given
+        List<String> items = List.of();
+        
+        // when
+        List<List<String>> batches = items.stream()
+            .gather(createBatchGatherer(3))
+            .toList();
+        
+        // then
+        assertTrue(batches.isEmpty());
+    }
+
+    @Test
+    void should_handle_partial_batch_when_batching() {
+        // given
+        List<String> items = List.of("A", "B");
+        
+        // when
+        List<List<String>> batches = items.stream()
+            .gather(createBatchGatherer(3))
+            .toList();
+        
+        // then
+        assertEquals(1, batches.size());
+        assertEquals(List.of("A", "B"), batches.get(0));
+    }
+
     private Gatherer<String, List<String>, List<String>> createPairGatherer() {
         return Gatherer.<String, List<String>, List<String>>of(
             ArrayList::new,
+
             (state, element, downstream) -> {
                 state.add(element);
                 if (state.size() == 2) {
@@ -87,6 +135,7 @@ class GatherersDemoTest {
     }
 
     private Gatherer<Integer, double[], Double> createRunningAverageGatherer() {
+        
         return Gatherer.<Integer, double[], Double>of(
             () -> new double[]{0.0, 0.0}, // [sum, count]
             (state, element, downstream) -> {
@@ -101,6 +150,29 @@ class GatherersDemoTest {
                 return state1;
             },
             (state, downstream) -> {}
+        );
+    }
+
+    private Gatherer<String, List<String>, List<String>> createBatchGatherer(int batchSize) {
+        return Gatherer.<String, List<String>, List<String>>of(
+            ArrayList::new,
+            (state, element, downstream) -> {
+                state.add(element);
+                if (state.size() == batchSize) {
+                    downstream.push(new ArrayList<>(state));
+                    state.clear();
+                }
+                return true;
+            },
+            (state1, state2) -> {
+                state1.addAll(state2);
+                return state1;
+            },
+            (state, downstream) -> {
+                if (!state.isEmpty()) {
+                    downstream.push(new ArrayList<>(state));
+                }
+            }
         );
     }
 } 

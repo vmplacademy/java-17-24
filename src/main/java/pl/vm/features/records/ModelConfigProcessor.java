@@ -5,105 +5,111 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * Demonstrates the use of Record Patterns in Java.
- * This class shows how to use pattern matching with records to extract and process their components.
+ * Demonstrates the use of Records in Java.
+ * This class shows how to process record instances and access their components.
  * 
  * Key aspects demonstrated:
- * 1. Record pattern matching in switch expressions
- * 2. Nested record patterns
- * 3. Record patterns with guards
- * 4. Record patterns in stream operations
- * 5. Unnamed pattern variables (JEP 443)
+ * 1. Record component access
+ * 2. Record validation
+ * 3. Record processing in streams
+ * 4. Record formatting
  * 
- * @see <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a>
- * @see <a href="https://openjdk.org/jeps/443">JEP 443: Unnamed Patterns and Variables</a>
+ * @see <a href="https://openjdk.org/jeps/395">JEP 395: Records</a>
  */
 public class ModelConfigProcessor {
     
     /**
-     * Process a model configuration using record patterns in switch expression.
+     * Process a model configuration using record components.
      */
     public String processConfig(ModelConfig config) {
-        return switch (config) {
-            case ModelConfig(String name, String version, int tokens, _, boolean stream, _) 
-                when stream -> "Streaming configuration: " + name + " (v" + version + ") with " + tokens + " tokens";
-            case ModelConfig(String name, String version, int tokens, _, _, _) 
-                when tokens > 4000 -> "Large context configuration: " + name + " (v" + version + ") with " + tokens + " tokens";
-            case ModelConfig(String name, String version, _, double temp, _, _) 
-                when temp < 0.3 -> "Precise configuration: " + name + " (v" + version + ") with temperature " + temp;
-            case ModelConfig defaultConfig -> "Standard configuration: " + defaultConfig.modelName() + " (v" + defaultConfig.version() + ")";
-        };
+        if (config.streaming()) {
+            return "Streaming configuration: " + config.modelName() + " (v" + config.version() + ") with " + config.maxTokens() + " tokens";
+        } else if (config.maxTokens() > 4000) {
+            return "Large context configuration: " + config.modelName() + " (v" + config.version() + ") with " + config.maxTokens() + " tokens";
+        } else if (config.temperature() < 0.3) {
+            return "Precise configuration: " + config.modelName() + " (v" + config.version() + ") with temperature " + config.temperature();
+        }
+        return "Standard configuration: " + config.modelName() + " (v" + config.version() + ")";
     }
     
     /**
-     * Process a list of configurations using record patterns in stream operations.
+     * Process a list of configurations using record components in stream operations.
      */
     public List<String> processConfigs(List<ModelConfig> configs) {
         return configs.stream()
-            .map(config -> switch (config) {
-                case ModelConfig(var name, _, var tokens, _, boolean stream, _) 
-                    when stream -> "Streaming: " + name + " (" + tokens + " tokens)";
-                case ModelConfig(var name, _, var tokens, _, _, _) 
-                    when tokens > 4000 -> "Large: " + name + " (" + tokens + " tokens)";
-                case ModelConfig(var name, _, _, var temp, _, _) 
-                    when temp < 0.3 -> "Precise: " + name + " (temp: " + temp + ")";
-                case ModelConfig defaultConfig -> "Standard: " + defaultConfig.modelName();
+            .map(config -> {
+                if (config.streaming()) {
+                    return "Streaming: " + config.modelName() + " (" + config.maxTokens() + " tokens)";
+                } else if (config.maxTokens() > 4000) {
+                    return "Large: " + config.modelName() + " (" + config.maxTokens() + " tokens)";
+                } else if (config.temperature() < 0.3) {
+                    return "Precise: " + config.modelName() + " (temp: " + config.temperature() + ")";
+                }
+                return "Standard: " + config.modelName();
             })
             .collect(Collectors.toList());
     }
     
     /**
-     * Validate a configuration using record patterns.
+     * Validate a configuration using record components.
      */
     public String validateConfig(ModelConfig config) {
-        return switch (config) {
-            case ModelConfig(_, _, int tokens, _, _, _) 
-                when tokens <= 0 -> "Invalid configuration: tokens must be positive";
-            case ModelConfig(_, _, _, double temp, _, _) 
-                when temp < 0.0 || temp > 1.0 -> "Invalid configuration: temperature must be between 0 and 1";
-            case ModelConfig(_, _, _, _, _, int timeout) 
-                when timeout <= 0 -> "Invalid configuration: timeout must be positive";
-            case ModelConfig defaultConfig -> "Valid configuration: " + defaultConfig.modelName();
-        };
+        if (config.maxTokens() <= 0) {
+            return "Invalid configuration: tokens must be positive";
+        } else if (config.temperature() < 0.0 || config.temperature() > 1.0) {
+            return "Invalid configuration: temperature must be between 0 and 1";
+        } else if (config.timeoutSeconds() <= 0) {
+            return "Invalid configuration: timeout must be positive";
+        }
+        return "Valid configuration: " + config.modelName();
     }
     
     /**
-     * Get configuration summary using record patterns.
+     * Get configuration summary using record components.
      */
     public String getConfigSummary(ModelConfig config) {
-        return switch (config) {
-            case ModelConfig(var name, var version, var tokens, var temp, var stream, var timeout) -> 
-                String.format(Locale.US, """
-                    Model: %s
-                    Version: %s
-                    Max Tokens: %d
-                    Temperature: %.2f
-                    Streaming: %s
-                    Timeout: %d seconds
-                    """, name, version, tokens, temp, stream, timeout);
-        };
+        return String.format(Locale.US, """
+            Model: %s
+            Version: %s
+            Max Tokens: %d
+            Temperature: %.2f
+            Streaming: %s
+            Timeout: %d seconds
+            """,
+            config.modelName(),
+            config.version(),
+            config.maxTokens(),
+            config.temperature(),
+            config.streaming(),
+            config.timeoutSeconds()
+        );
     }
 
     /**
-     * Get detailed configuration analysis using all properties.
-     * Demonstrates a case where all record properties are used in pattern matching.
+     * Get detailed configuration analysis using all record components.
      */
     public String getDetailedAnalysis(ModelConfig config) {
-        return switch (config) {
-            case ModelConfig(String name, String version, int tokens, double temp, boolean stream, int timeout) -> {
-                String performance = tokens > 4000 ? "high" : "standard";
-                String precision = temp < 0.3 ? "high" : "balanced";
-                String mode = stream ? "streaming" : "batch";
-                String reliability = timeout > 60 ? "high" : "standard";
-                
-                yield String.format(Locale.US, """
-                    Detailed Analysis for %s (v%s):
-                    - Performance: %s (tokens: %d)
-                    - Precision: %s (temperature: %.2f)
-                    - Mode: %s
-                    - Reliability: %s (timeout: %d seconds)
-                    """, name, version, performance, tokens, precision, temp, mode, reliability, timeout);
-            }
-        };
+        String performance = config.maxTokens() > 4000 ? "high" : "standard";
+        String precision = config.temperature() < 0.3 ? "high" : "balanced";
+        String mode = config.streaming() ? "streaming" : "batch";
+        String reliability = config.timeoutSeconds() > 60 ? "high" : "standard";
+        
+        return String.format(Locale.US, """
+            Detailed Analysis for %s (v%s):
+            - Performance: %s (tokens: %d)
+            - Precision: %s (temperature: %.2f)
+            - Mode: %s
+            - Reliability: %s (timeout: %d seconds)
+            """,
+            config.modelName(),
+            config.version(),
+            performance,
+            config.maxTokens(),
+            precision,
+            config.temperature(),
+            mode,
+            reliability,
+            config.timeoutSeconds()
+        );
     }
 } 
